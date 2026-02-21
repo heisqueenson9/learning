@@ -1,0 +1,54 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# ── Environment Variables (NEVER commit these) ────────────────────────────────
+.env
+.env.*
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.local
+frontend/.env.*
+!frontend/.env.example
+
+# ── Database ──────────────────────────────────────────────────────────────────
+*.db
+*.sqlite3
+backend/apex.db
+
+# ── AI Model Files (large — managed via HuggingFace cache) ───────────────────
+backend/models/
+temp_uploads/
+backend/temp_uploads/
+static/avatars/
+
+# ── Python packaging ──────────────────────────────────────────────────────────
+*.egg-info/
+dist/
+build/
+
+# ── Node ──────────────────────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.cache/
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
