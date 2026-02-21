@@ -56,7 +56,8 @@ async def generate_exam(
             "topic": topic if topic else (file.filename if file else "Uploaded Document"),
             "level": level,
             "exam_type": exam_type,
-            "difficulty": difficulty
+            "difficulty": difficulty,
+            "num_questions": 50
         }
 
         print(f"Generating 50 questions for topic: {logic['topic']}")

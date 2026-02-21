@@ -113,26 +113,30 @@ def get_payments(db: Session = Depends(get_db), admin: None = Depends(require_ad
 
 @app.post("/api/v1/exams/generate")
 async def generate_exam(level: str = Form(...), exam_type: str = Form(...), difficulty: str = Form(...), topic: str = Form(None)):
+    from app.services.ai_engine import ai_engine
     import asyncio
-    await asyncio.sleep(2) # simulate processing
-    # Dummy mock quiz
+    import json
+
+    logic = {
+        "topic": topic or "General Knowledge",
+        "level": level,
+        "exam_type": exam_type,
+        "difficulty": difficulty,
+        "num_questions": 1000
+    }
+
+    text_content = f"Topic: {topic}. Level: {level}. Generate 1000 comprehensive questions for this topic."
+    
+    # Run AI generation
+    generated_content_str = await asyncio.to_thread(ai_engine.generate_questions, text_content, logic)
+    
+    try:
+        parsed_data = json.loads(generated_content_str)
+    except:
+        parsed_data = {"questions": []}
+        
     return {
-        "questions": {
-            "questions": [
-                {
-                    "id": "q1",
-                    "question": f"What is the core concept of {topic or 'the uploaded material'}?",
-                    "options": ["A. Fundamental principle", "B. Advanced theory", "C. Irrelevant detail", "D. None of the above"],
-                    "answer": "A. Fundamental principle"
-                },
-                {
-                    "id": "q2",
-                    "question": f"In the context of the {level} syllabus, how does this apply?",
-                    "options": ["A. Directly", "B. Indirectly", "C. Not at all", "D. Only in theory"],
-                    "answer": "A. Directly"
-                }
-            ]
-        }
+        "questions": parsed_data
     }
 
 @app.get("/api/v1/exams/history")

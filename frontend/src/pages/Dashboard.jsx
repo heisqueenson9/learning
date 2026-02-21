@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { FileText, History, LogOut, Shield, Home, PlusCircle, Flame } from "lucide-react";
+import { FileText, History, LogOut, Shield, Home, PlusCircle, Flame, User } from "lucide-react";
 
 export default function Dashboard() {
     const location = useLocation();

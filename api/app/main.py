@@ -61,6 +61,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 async def health():
     return {"status": "Server running"}
 
+@app.get("/api/v1/ai-status")
+def ai_status():
+    return {"mode": "free", "ready": True, "failed": False}
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to APEX EduAI API v2 (No Auth)"}

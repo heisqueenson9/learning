@@ -30,7 +30,7 @@ class AIEngine:
         """
         topic      = logic.get("topic", "General Knowledge")
         difficulty = logic.get("difficulty", "Moderate")
-        num_q      = int(logic.get("num_questions", 50))
+        num_q      = int(logic.get("num_questions", 1000))
 
         if not API_KEY:
             # Fallback to rich mock to save size
@@ -100,9 +100,9 @@ class AIEngine:
         """Rich topic-aware fallback to prevent local Vercel crash."""
         topic = logic.get("topic", "General Knowledge")
         t     = topic.replace('"', "").strip()
-        num_q = int(logic.get("num_questions", 50))
+        num_q = int(logic.get("num_questions", 1000))
 
-        bank = [
+        base_bank = [
             # ── Core Definitions (1–10) ──────────────────────────────────────
             {"q": f"What is the primary function of {t}?",
              "opts": ["Data storage and retrieval",
@@ -380,6 +380,10 @@ class AIEngine:
                       "Only the team's preferred colour palette"],
              "ans": "Team expertise, project requirements, and scalability needs"},
         ]
+
+        # Duplicate the bank to make sure we have enough questions if requested
+        multiplier = max(1, (num_q // len(base_bank)) + 1)
+        bank = (base_bank * multiplier)[:num_q]
 
         questions = [
             {

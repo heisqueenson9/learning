@@ -137,8 +137,17 @@ export default function AdultGames() {
 
         setIsSubmitting(true);
         try {
-            // Mock network latency
-            await new Promise(resolve => setTimeout(resolve, 800));
+            const fullName = localStorage.getItem("apex_user_name") || "Anonymous";
+            const API = import.meta.env.VITE_API_URL || "/api/v1";
+            await fetch(`${API}/games/answer`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    full_name: fullName,
+                    question: currentQuestion,
+                    answer: answer
+                })
+            });
 
             // Move to next or finish
             if (qIndex < QUESTIONS.length - 1) {
@@ -149,7 +158,7 @@ export default function AdultGames() {
                 navigate("/");
             }
         } catch (err) {
-            console.error("Failed to log game:", err);
+            // Failed to log game
         } finally {
             setIsSubmitting(false);
         }

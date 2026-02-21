@@ -4,3 +4,7 @@ sqlalchemy
 psycopg2-binary
 python-dotenv
 python-multipart
+httpx
+passlib[bcrypt]
+python-jose[cryptography]
+pydantic

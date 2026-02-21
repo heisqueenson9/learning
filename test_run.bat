@@ -1,2 +1,3 @@
-cd frontend
-call npm run dev > dev_server.log 2>&1
+@echo off
+cd /d "%~dp0frontend"
+call npm run dev

@@ -10,8 +10,6 @@ export default function AdminLogin({ isEmbedded = false, onBack = null }) {
     const navigate = useNavigate();
 
     const [phone, setPhone] = useState("");
-    const [password, setPassword] = useState("");
-    const [showPw, setShowPw] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [shaking, setShaking] = useState(false);
@@ -26,36 +24,20 @@ export default function AdminLogin({ isEmbedded = false, onBack = null }) {
         setError("");
         setLoading(true);
 
-        // Strict hardcoded validation as requested
-        if (phone.trim() !== "0202979378" || password !== "FlameFlame@99") {
-            setError("Invalid admin credentials. Access denied.");
+        // Client-side quick check as requested
+        if (phone.trim() !== "0202979378") {
+            setError("Invalid admin phone number. Access denied.");
             shake();
             setLoading(false);
             return;
         }
 
         try {
-            // Validate credentials against the backend admin endpoint directly
-            await api.get("/payments/admin/users", {
-                headers: {
-                    "X-Admin-Phone": phone.trim(),
-                    "X-Admin-Password": password,
-                },
-            });
-            // If we reach here, credentials are valid
             sessionStorage.setItem("apex_admin_auth", "1");
-            sessionStorage.setItem("apex_admin_phone", phone.trim());
-            sessionStorage.setItem("apex_admin_password", password);
+            sessionStorage.setItem("apex_admin_password", "FlameFlame@99");
             navigate("/admin");
         } catch (err) {
-            const detail = err.response?.data?.detail;
-            if (err.response?.status === 403) {
-                setError("Invalid admin credentials. Access denied.");
-            } else if (!err.response) {
-                setError("Cannot reach server. Make sure the backend is running.");
-            } else {
-                setError(detail || "Authentication failed. Please try again.");
-            }
+            setError("Authentication failed. Please try again.");
             shake();
         } finally {
             setLoading(false);
@@ -80,14 +62,22 @@ export default function AdminLogin({ isEmbedded = false, onBack = null }) {
                 <div className="absolute top-0 right-0 -mr-16 -mt-16 w-36 h-36 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
 
                 {/* Back to user login */}
-                {!isEmbedded && (
+                {isEmbedded && onBack ? (
+                    <button
+                        type="button"
+                        onClick={onBack}
+                        className="w-full flex items-center justify-center gap-2 py-3 mb-5 glass border border-white/15 hover:border-blue-500/40 text-gray-300 hover:text-white transition-all rounded-xl text-sm font-semibold"
+                    >
+                        <ArrowLeft size={15} /> Back to User Login
+                    </button>
+                ) : !isEmbedded ? (
                     <Link
                         to="/login"
                         className="w-full flex items-center justify-center gap-2 py-3 mb-5 glass border border-white/15 hover:border-blue-500/40 text-gray-300 hover:text-white transition-all rounded-xl text-sm font-semibold"
                     >
                         <ArrowLeft size={15} /> Back to User Login
                     </Link>
-                )}
+                ) : null}
 
                 {/* Header */}
                 <div className="text-center space-y-3 mb-8">
@@ -130,32 +120,7 @@ export default function AdminLogin({ isEmbedded = false, onBack = null }) {
                         </div>
                     </div>
 
-                    {/* Password */}
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                            Password
-                        </label>
-                        <div className="relative">
-                            <KeyRound size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
-                            <input
-                                type={showPw ? "text" : "password"}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="Admin password"
-                                autoComplete="current-password"
-                                className="glass-input w-full pl-10 pr-12 py-3.5 text-white placeholder:text-gray-600"
-                                required
-                            />
-                            <button
-                                type="button"
-                                tabIndex={-1}
-                                onClick={() => setShowPw(!showPw)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
-                            >
-                                {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
-                            </button>
-                        </div>
-                    </div>
+                    {/* Password Removed as requested */}
 
                     {/* Error */}
                     {error && (

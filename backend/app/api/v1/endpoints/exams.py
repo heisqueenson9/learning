@@ -54,7 +54,7 @@ async def generate_exam(
                 raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
 
         elif topic:
-            text_content = f"Topic: {topic}. Level: {level}. Generate 50 comprehensive questions for this topic."
+            text_content = f"Topic: {topic}. Level: {level}. Generate 1000 comprehensive questions for this topic."
         else:
             raise HTTPException(status_code=400, detail="Either a File or a Topic is required.")
 
@@ -62,10 +62,11 @@ async def generate_exam(
             "topic": topic if topic else (file.filename if file else "Uploaded Document"),
             "level": level,
             "exam_type": exam_type,
-            "difficulty": difficulty
+            "difficulty": difficulty,
+            "num_questions": 1000
         }
 
-        print(f"Generating 50 questions for user {current_user.id} — topic: {logic['topic']}")
+        print(f"Generating 1000 questions for user {current_user.id} — topic: {logic['topic']}")
 
         # Run AI generation in thread pool (non-blocking for other requests)
         generated_content = await asyncio.to_thread(ai_engine.generate_questions, text_content, logic)

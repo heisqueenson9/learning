@@ -11,11 +11,14 @@ import logging
 import httpx
 from typing import Optional
 
-# Set APEX_OPENAI_API_KEY in Vercel to use actual AI.
-API_KEY = os.environ.get("APEX_OPENAI_API_KEY", "")
-API_URL = "https://api.openai.com/v1/chat/completions"
+import httpx
+from typing import Optional
+import urllib.parse
 
 logger = logging.getLogger(__name__)
+
+# Pollinations AI is a stable, strictly free text generation API that requires no keys.
+# Ideal for Vercel Free Tier usage without any authentication setups.
 
 class AIEngine:
     """Lightweight AI Engine querying external APIs to save Lambda size."""
@@ -26,35 +29,12 @@ class AIEngine:
 
     def generate_questions(self, text_content: str, logic: dict) -> str:
         """
-        Generate a MCQ bank as a JSON string via external API or robust Mock logic.
+        Generate a MCQ bank as a JSON string via free external API.
         """
         topic      = logic.get("topic", "General Knowledge")
         difficulty = logic.get("difficulty", "Moderate")
         num_q      = int(logic.get("num_questions", 50))
 
-        if not API_KEY:
-            # Fallback to rich mock to save size
-            print("[AIEngine] 🔌 No external API_KEY detected. Using robust local fallback.")
-            return self._mock_generation(text_content, logic)
-
-        try:
-            questions = self._call_external_api(text_content, topic, difficulty, num_q)
-            if len(questions) < max(5, num_q // 5):
-                print(f"[AIEngine] External API returned too few ({len(questions)}), combining with mock.")
-                mock_data = json.loads(self._mock_generation(text_content, logic))
-                combined  = questions + mock_data["questions"]
-                questions = combined[:num_q]
-
-            return json.dumps({
-                "title": f"{topic} — {num_q}-Question Assessment",
-                "questions": questions[:num_q],
-            })
-        except Exception as exc:
-            print(f"[AIEngine] ❌ External API error: {exc} — using fallback.")
-            return self._mock_generation(text_content, logic)
-
-    def _call_external_api(self, text: str, topic: str, difficulty: str, n: int) -> list:
-        # Prompt construction
         difficulty_hint = {
             "Easy": "straightforward recall questions",
             "Moderate": "application-level questions",
@@ -62,39 +42,57 @@ class AIEngine:
         }.get(difficulty, "balanced questions")
 
         prompt = (
-            f"Generate exactly {n} multiple choice questions about '{topic}'. "
-            f"Difficulty: {difficulty} ({difficulty_hint}). "
+            f"Generate exactly {num_q} multiple choice questions about '{topic}'. "
+            f"Difficulty must be {difficulty} ({difficulty_hint}). "
             f"Format strictly as JSON with an array named 'questions', where each element is an object with: "
-            f"'question', 'options' (Array of 4 strings), and 'answer' (exact string matching an option). "
-            f"Use the following text as context if relevant: {text[:4000]}"
-        )
+            f"'question', 'options' (Array of exactly 4 strings), and 'answer' (exact string matching an option). "
+            f"Only return the JSON. Never add any conversation or markdown ticks. "
+            f"Use the following text as context if relevant: {text_content[:2000]}"
+        ).replace(" ", "%20")
+        
+        url = f"https://text.pollinations.ai/{urllib.parse.quote(prompt)}?json=true"
+        print(f"[AIEngine] Requesting free AI integration: text.pollinations.ai")
+        
+        try:
+            with httpx.Client(timeout=60.0) as client:
+                resp = client.get(url)
+                resp.raise_for_status()
+                content = resp.text
 
-        with httpx.Client(timeout=60.0) as client:
-            resp = client.post(
-                API_URL,
-                headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-                json={
-                    "model": "gpt-3.5-turbo",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.7,
-                }
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            content = data["choices"][0]["message"]["content"]
-            
-            # Extract JSON block typically wrapped in markdown codeblocks
-            start_idx = content.find("{")
-            end_idx = content.rfind("}") + 1
-            if start_idx != -1 and end_idx != -1:
-                json_str = content[start_idx:end_idx]
-                parsed = json.loads(json_str)
-                qs = parsed.get("questions", [])
-                # Add IDs dynamically
-                for i, q in enumerate(qs):
-                    q["id"] = i + 1
-                return qs
-            return []
+                # Clean potential markdown ticks if returned
+                content = content.replace("```json", "").replace("```", "").strip()
+
+                start_idx = content.find("{")
+                end_idx = content.rfind("}") + 1
+                
+                if start_idx != -1 and end_idx != -1:
+                    json_str = content[start_idx:end_idx]
+                    parsed = json.loads(json_str)
+                    qs = parsed.get("questions", [])
+                    # Add IDs dynamically
+                    for i, q in enumerate(qs):
+                        q["id"] = i + 1
+                    
+                    if len(qs) < max(5, num_q // 5):
+                        print(f"[AIEngine] Free AI returned too few ({len(qs)}). Checking mock fallback.")
+                        return self._mock_generation(text_content, logic)
+                        
+                    original_qs = list(qs)
+                    while len(qs) < num_q:
+                        qs.extend(original_qs)
+                    qs = qs[:num_q]
+                    
+                    for i, q in enumerate(qs):
+                        q["id"] = i + 1
+
+                    return json.dumps({
+                        "title": f"{topic} — {num_q}-Question Assessment",
+                        "questions": qs,
+                    })
+                return self._mock_generation(text_content, logic)
+        except Exception as exc:
+            print(f"[AIEngine] ❌ Free AI error: {exc} — using fallback.")
+            return self._mock_generation(text_content, logic)
 
     def _mock_generation(self, text: str, logic: dict) -> str:
         """Rich topic-aware fallback to prevent local Vercel crash."""
@@ -384,12 +382,11 @@ class AIEngine:
         questions = [
             {
                 "id":       i + 1,
-                "question": qd["q"],
-                "options":  qd["opts"],
-                "answer":   qd["ans"],
+                "question": bank[i % len(bank)]["q"],
+                "options":  bank[i % len(bank)]["opts"],
+                "answer":   bank[i % len(bank)]["ans"],
             }
-            # Handle potential index out of bound gracefully if more logic applies
-            for i, qd in enumerate(bank[:num_q])
+            for i in range(num_q)
         ]
 
         return json.dumps({

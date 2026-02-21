@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }) => {
                     logout();
                 }
             } catch (err) {
-                console.error("Session validation failed:", err);
+                // Session validation failed
                 logout();
             } finally {
                 setLoading(false);

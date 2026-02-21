@@ -115,7 +115,6 @@ export default function GenerateExam() {
                 setError(detail || err.message || "Failed to generate exam. The AI engine might be warming up.");
             }
             if (attempts > 0) {
-                console.log(`Retrying generation... Attempts left: ${attempts}`);
                 setRetryCount((prev) => prev + 1);
                 await new Promise((resolve) => setTimeout(resolve, 2000));
                 return generateWithRetry(formData, attempts - 1);
@@ -175,7 +174,6 @@ export default function GenerateExam() {
                     parsedQuestions = JSON.parse(cleanedContent);
                 }
             } catch (jsonErr) {
-                console.warn("Parsing Error", jsonErr);
                 setError("Received invalid quiz format. Please try again or use a simpler topic.");
                 setLoading(false);
                 return;
@@ -188,11 +186,10 @@ export default function GenerateExam() {
             }
 
             setQuizData(parsedQuestions);
-            setTimeLeft(parsedQuestions.questions.length * 60); // 1 min per question
+            setTimeLeft(90 * 60); // 1hr 30min
             setIsActive(true);
 
         } catch (err) {
-            console.error("Generation failed full error:", err);
             let message = "Generation failed. Please try again.";
 
             if (err.code === "ECONNABORTED" || err.message.includes("timeout")) {
@@ -470,7 +467,7 @@ export default function GenerateExam() {
                                 <h3 className="text-xl font-bold text-gray-400">Assessment Complete</h3>
                                 <h2 className="text-6xl font-black text-white">{score}%</h2>
                                 <p className={`text-lg font-bold ${score >= 50 ? "text-green-400" : "text-red-400"}`}>
-                                    {score >= 50 ? "EXCELLENT WORK SCHOLAR" : "NEEDS IMPROVEMENT"}
+                                    {score >= 50 ? "Congratulations you have passed." : "You have failed."}
                                 </p>
                             </div>
 
@@ -490,7 +487,7 @@ export default function GenerateExam() {
                                     onClick={() => navigate("/")}
                                     className="flex items-center gap-2 px-5 py-3 glass border border-white/10 text-gray-300 hover:text-white hover:border-white/30 font-semibold rounded-xl transition-all"
                                 >
-                                    <Home size={16} /> Home
+                                    <Home size={16} /> Home Screen
                                 </button>
                                 <button
                                     onClick={() => { setQuizData(null); setScore(null); setUserAnswers({}); setShowSuccessModal(false); }}
@@ -499,7 +496,7 @@ export default function GenerateExam() {
                                     <FileText size={16} /> New Assessment
                                 </button>
                                 <button
-                                    onClick={() => { setScore(null); setUserAnswers({}); setShowSuccessModal(false); setTimeLeft(quizData.questions.length * 60); setIsActive(true); }}
+                                    onClick={() => { setScore(null); setUserAnswers({}); setShowSuccessModal(false); setTimeLeft(90 * 60); setIsActive(true); }}
                                     className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-95"
                                 >
                                     <RotateCcw size={16} /> Retake Quiz
