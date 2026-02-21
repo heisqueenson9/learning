@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import {
     Heart, ArrowRight, ShieldAlert, Sparkles,
@@ -124,7 +123,6 @@ const QUESTIONS = [
 ];
 
 export default function AdultGames() {
-    const { user } = useAuth();
     const navigate = useNavigate();
     const [qIndex, setQIndex] = useState(0);
     const [answer, setAnswer] = useState("");
@@ -139,11 +137,8 @@ export default function AdultGames() {
 
         setIsSubmitting(true);
         try {
-            await api.post(`/auth/adult-game-log-v2?phone_number=${user.phone}`, {
-                game_title: "Naughty Truths",
-                question: currentQuestion,
-                answer: answer
-            });
+            // Mock network latency
+            await new Promise(resolve => setTimeout(resolve, 800));
 
             // Move to next or finish
             if (qIndex < QUESTIONS.length - 1) {

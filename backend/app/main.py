@@ -1,144 +1,152 @@
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-from app.core.config import settings
-from app.api.v1.endpoints import auth, exams, users, payments
-from contextlib import asynccontextmanager
-from app.db.session import engine, Base, SessionLocal
-from datetime import datetime
-from app.models.user import User
-from fastapi.staticfiles import StaticFiles
 import os
-import time
+import base64
+from datetime import datetime
+from typing import List
 
-# ── Security headers middleware ───────────────────────────────────────────────
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        return response
+from fastapi import FastAPI, UploadFile, Form, Header, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from dotenv import load_dotenv
 
+load_dotenv()
 
-# ── Database Initialization (Serverless Safe) ──────────────────────────────────
-try:
-    print("Creating database tables...")
-    Base.metadata.create_all(bind=engine)
-    print("Database tables created or verified.")
-except Exception as e:
-    print(f"Error during db setup: {e}")
+# Database Config
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./apex_unified.db")
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# ── Lifespan ─────────────────────────────────────────────────────────────────
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # ── Startup ────────────────────────────────────────────────────────────
-    # print("Creating database tables...")
-    # Base.metadata.create_all(bind=engine)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True) if "sqlite" not in DATABASE_URL else create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
-    # ── Auto Schema Update ──────────────────────────────────────────────────
+class Payment(Base):
+    __tablename__ = "payments"
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String(100), index=True)
+    phone = Column(String(20), index=True)
+    screenshot_url = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# Ensure tables exist for Serverless
+Base.metadata.create_all(bind=engine)
+
+def get_db():
+    db = SessionLocal()
     try:
-        from sqlalchemy import inspect, text
-        inspector = inspect(engine)
-        if "users" in inspector.get_table_names():
-            columns = [c["name"] for c in inspector.get_columns("users")]
-            with engine.begin() as conn:
-                for col_name in ["full_name", "email", "institution", "hashed_password", "avatar_url"]:
-                    if col_name not in columns:
-                        try:
-                            # Postgres uses slightly different syntax, but ALTER TABLE ADD COLUMN works
-                            conn.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} VARCHAR"))
-                            print(f"Auto-added missing column: {col_name}")
-                        except Exception as e:
-                            print(f"Could not add {col_name}: {e}")
-    except Exception as e:
-        print(f"Schema generation/update error: {e}")
+        yield db
+    finally:
+        db.close()
 
-    # Ensure static dirs exist
-    os.makedirs("static/avatars", exist_ok=True)
-    os.makedirs("temp_uploads", exist_ok=True)
+app = FastAPI(title="APEX Simple Auth")
 
-    # Pre-warm the AI engine 
-    from app.services.ai_engine import ai_engine as _engine  # noqa: F401
-    print("[Startup] AI engine initialised.")
-
-    yield
-
-
-
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan,
-)
-
-# ── Security headers ──────────────────────────────────────────────────────────
-app.add_middleware(SecurityHeadersMiddleware)
-
-# ── CORS ─────────────────────────────────────────────────────────────────────
-# IMPORTANT: wildcard "*" is incompatible with allow_credentials=True.
-# We use the explicit list from config instead, OR allow_origin_regex='.*' if needed.
-allowed_origins = settings.get_allowed_origins()
+# CORS Setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins if allowed_origins and "*" not in allowed_origins else [],
-    allow_origin_regex=".*" if not allowed_origins or "*" in allowed_origins else None,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
 )
 
-# ── Routers ───────────────────────────────────────────────────────────────────
-app.include_router(auth.router,     prefix="/api/v1/auth",     tags=["auth"])
-app.include_router(exams.router,    prefix="/api/v1/exams",    tags=["exams"])
-app.include_router(users.router,    prefix="/api/v1/users",    tags=["users"])
-app.include_router(payments.router, prefix="/api/v1/payments", tags=["payments"])
+# Admin Secret
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "FlameFlame@99")
 
-# ── Static Files ──────────────────────────────────────────────────────────────
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-
-# ── Global error handler ──────────────────────────────────────────────────────
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    print(f"Global Error: {exc}")
-    return JSONResponse(
-        status_code=500,
-        content={"success": False, "message": "An internal server error occurred.", "detail": str(exc)},
-    )
-
-
-# ── Health & root ─────────────────────────────────────────────────────────────
-@app.get("/health")
-async def health():
-    return {"status": "Server running", "timestamp": datetime.utcnow().isoformat()}
-
+def require_admin(x_admin_key: str = Header(...)):
+    if x_admin_key != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid admin key.")
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to APEX EduAI Vault API"}
+    return {"message": "APEX Server Active"}
 
+@app.post("/api/v1/upload-payment")
+async def upload_payment(
+    full_name: str = Form(...),
+    phone: str = Form(...),
+    screenshot: UploadFile = Form(...),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Read file and convert to base64 Data URI to avoid local storage issues on Vercel
+        file_bytes = await screenshot.read()
+        encoded = base64.b64encode(file_bytes).decode('utf-8')
+        mime_type = screenshot.content_type or "image/jpeg"
+        data_uri = f"data:{mime_type};base64,{encoded}"
 
-# ── AI model status ───────────────────────────────────────────────────────────
-@app.get("/api/v1/ai-status")
-async def ai_status():
-    """
-    Poll this endpoint to know whether the local Flan-T5 model has finished
-    downloading and is ready to generate real questions.
-    """
-    from app.services.ai_engine import ai_engine
+        # Save to DB
+        payment = Payment(
+            full_name=full_name,
+            phone=phone,
+            screenshot_url=data_uri
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+
+        return {"access": True, "message": "Payment uploaded successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/admin/payments")
+def get_payments(db: Session = Depends(get_db), admin: None = Depends(require_admin)):
+    try:
+        payments = db.query(Payment).order_by(Payment.created_at.desc()).all()
+        return [
+            {
+                "id": p.id,
+                "full_name": p.full_name,
+                "phone": p.phone,
+                "screenshot_url": p.screenshot_url,
+                "created_at": p.created_at.isoformat() if p.created_at else None
+            }
+            for p in payments
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==========================================
+# MOCK ENDPOINTS TO KEEP FRONTEND FUNCTIONAL
+# ==========================================
+
+@app.post("/api/v1/exams/generate")
+async def generate_exam(level: str = Form(...), exam_type: str = Form(...), difficulty: str = Form(...), topic: str = Form(None)):
+    import asyncio
+    await asyncio.sleep(2) # simulate processing
+    # Dummy mock quiz
     return {
-        "model":   settings.APEX_AI_MODEL,
-        "ready":   ai_engine.is_ready,
-        "loading": ai_engine._loading,
-        "failed":  ai_engine._load_failed,
-        "mode":    (
-            "local-ai" if ai_engine.is_ready
-            else "loading" if ai_engine._loading
-            else "mock"
-        ),
+        "questions": {
+            "questions": [
+                {
+                    "id": "q1",
+                    "question": f"What is the core concept of {topic or 'the uploaded material'}?",
+                    "options": ["A. Fundamental principle", "B. Advanced theory", "C. Irrelevant detail", "D. None of the above"],
+                    "answer": "A. Fundamental principle"
+                },
+                {
+                    "id": "q2",
+                    "question": f"In the context of the {level} syllabus, how does this apply?",
+                    "options": ["A. Directly", "B. Indirectly", "C. Not at all", "D. Only in theory"],
+                    "answer": "A. Directly"
+                }
+            ]
+        }
     }
+
+@app.get("/api/v1/exams/history")
+def get_history():
+    return {"exams": []}
+
+@app.get("/api/v1/ai-status")
+def ai_status():
+    return {"mode": "mock", "ready": True, "failed": False}
+
+@app.post("/api/v1/auth/adult-game-log-v2")
+def log_adult_game():
+    return {"status": "success"}
+
+@app.post("/api/v1/auth/upload-avatar")
+def upload_avatar():
+    return {"avatar_url": ""}

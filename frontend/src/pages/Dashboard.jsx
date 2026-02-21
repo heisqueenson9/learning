@@ -1,104 +1,21 @@
 import { Link, useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import api from "../services/api";
-import { FileText, History, User, LogOut, Clock, Shield, Home, PlusCircle, Flame } from "lucide-react";
+import { FileText, History, LogOut, Shield, Home, PlusCircle, Flame } from "lucide-react";
 
 export default function Dashboard() {
-    const { user, logout } = useAuth();
     const location = useLocation();
-
-    const formatDate = (dateString) => {
-        if (!dateString) return "N/A";
-        return new Date(dateString).toLocaleDateString("en-GB", {
-            day: "numeric", month: "short", year: "numeric"
-        });
-    };
-
-    // Calculate days remaining in subscription
-    const getDaysRemaining = () => {
-        if (!user?.subscription_end) return null;
-        const now = new Date();
-        const end = new Date(user.subscription_end);
-        const diffMs = end - now;
-        if (diffMs <= 0) return 0;
-        return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-    };
-
-    const daysRemaining = getDaysRemaining();
 
     return (
         <div className="box space-y-8 pb-20 relative z-20">
 
             {/* Welcome Header */}
-            <div className="glass p-8 flex justify-between items-center relative overflow-hidden">
+            <div className="glass p-8 flex justify-between items-center relative overflow-hidden flex-wrap gap-4">
                 <div className="relative z-10">
                     <h2 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-white dark:to-blue-200 tracking-tight">
-                        Welcome back, {user?.full_name?.split(" ")[0] || "Scholar"}
+                        Welcome, Scholar
                     </h2>
                     <p className="text-gray-600 dark:text-gray-400 mt-2 font-medium text-lg">
-                        Your academic vault is ready.
+                        Your academic vault is active.
                     </p>
-
-                    {/* Subscription Countdown */}
-                    {daysRemaining !== null && (
-                        <div className={`mt-4 inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold border ${daysRemaining <= 3
-                            ? "bg-red-100 border-red-300 text-red-600 dark:bg-red-900/30 dark:border-red-700 dark:text-red-400"
-                            : "bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-700/50 dark:text-blue-400"
-                            }`}>
-                            <Clock size={14} />
-                            {daysRemaining === 0
-                                ? "Subscription expires today"
-                                : `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} remaining`}
-                            {user?.subscription_end && (
-                                <span className="opacity-70 text-xs">
-                                    (until {formatDate(user.subscription_end)})
-                                </span>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* User Icon + Logout */}
-                <div className="flex flex-col items-center gap-3 relative z-10">
-                    <div className="relative group">
-                        <div className="absolute inset-0 bg-primary/20 rounded-full blur-lg group-hover:bg-primary/40 transition-all duration-500" />
-                        <div className="w-14 h-14 rounded-full glass flex items-center justify-center text-primary group-hover:text-blue-500 transition-all duration-300 relative overflow-hidden">
-                            {user?.avatar_url ? (
-                                <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                            ) : (
-                                <User size={28} />
-                            )}
-                            {/* Hidden file input for upload */}
-                            <input
-                                type="file"
-                                accept="image/*"
-                                className="absolute inset-0 opacity-0 cursor-pointer"
-                                onChange={async (e) => {
-                                    const file = e.target.files[0];
-                                    if (!file) return;
-                                    const formData = new FormData();
-                                    formData.append("file", file);
-                                    try {
-                                        const res = await api.post(`/auth/upload-avatar?phone_number=${user.phone}`, formData);
-                                        // Update local user data
-                                        const updated = { ...user, avatar_url: res.data.avatar_url };
-                                        localStorage.setItem("user_data", JSON.stringify(updated));
-                                        window.location.reload(); // Simple refresh to update UI
-                                    } catch (err) {
-                                        alert("Upload failed.");
-                                    }
-                                }}
-                            />
-                        </div>
-                    </div>
-                    <button
-                        onClick={logout}
-                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 transition-colors font-medium"
-                        title="Logout"
-                    >
-                        <LogOut size={14} />
-                        Logout
-                    </button>
                 </div>
             </div>
 

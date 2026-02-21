@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../services/api";
-import { useAuth } from "../context/AuthContext";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { File as FileIcon, Loader2, Settings, BookOpen, FileText, CheckCircle, X, Check, RotateCcw, Clock, Trophy, AlertCircle, AlertTriangle, Cpu, Home, BarChart2, Save, PlusCircle, History } from "lucide-react";
 import confetti from "canvas-confetti";
 import SuccessModal from "../components/common/SuccessModal";
 
 export default function GenerateExam() {
-    useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [mode, setMode] = useState("topic"); // topic or file

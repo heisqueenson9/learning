@@ -15,8 +15,7 @@ class Settings:
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
     # Optional overrides, otherwise fallback to defaults
-    ADMIN_PHONE = os.getenv("ADMIN_PHONE", "0202979378")
-    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "FlameFlame@99")
+    ADMIN_SECRET = os.getenv("ADMIN_SECRET", "FlameFlame@99")
 
     ALLOWED_ORIGINS = ["*"]
 

@@ -1,30 +1,18 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";
-import { Suspense, lazy, useEffect } from "react";
-import { Loader2, User, LogOut, Sun, Moon } from "lucide-react";
-import { useState } from "react";
-
-// Theme initialization is now handled in the Layout component
+import { Suspense, lazy, useEffect, useState } from "react";
+import { Loader2, LogOut } from "lucide-react";
 
 // Lazy Load Pages
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Login = lazy(() => import("./pages/Login"));
-const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+const AdminPage = lazy(() => import("./pages/AdminPage"));
 const GenerateExam = lazy(() => import("./pages/GenerateExam"));
 const HistoryPage = lazy(() => import("./pages/HistoryPage"));
-const AdminPage = lazy(() => import("./pages/AdminPage"));
 const AdultGames = lazy(() => import("./pages/AdultGames"));
 
 function PrivateRoute({ children }) {
-    const { user, loading } = useAuth();
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <Loader2 className="animate-spin text-primary" size={48} />
-            </div>
-        );
-    }
-    if (!user) return <Navigate to="/login" replace />;
+    const hasAccess = localStorage.getItem("accessGranted") === "true";
+    if (!hasAccess) return <Navigate to="/login" replace />;
     return children;
 }
 
@@ -37,11 +25,17 @@ function LoadingFallback() {
 }
 
 function Layout({ children }) {
-    const { user, logout } = useAuth();
+    const hasAccess = localStorage.getItem("accessGranted") === "true";
+
     useEffect(() => {
         document.documentElement.classList.add("dark");
         localStorage.setItem("theme", "dark");
     }, []);
+
+    const handleLogout = () => {
+        localStorage.removeItem("accessGranted");
+        window.location.href = "/login";
+    };
 
     return (
         <div className="min-h-screen bg-light-bg dark:bg-dark-bg text-light-text dark:text-dark-text transition-colors duration-700 relative overflow-hidden font-sans selection:bg-primary/30 selection:text-primary-700">
@@ -67,26 +61,10 @@ function Layout({ children }) {
                     </div>
                     {/* Header Controls */}
                     <div className="flex items-center gap-4">
-                        {/* Theme toggle removed to enforce Dark Mode exclusively */}
-                        {user && (
-                            <div className="flex items-center gap-3">
-                                <div className="hidden md:block text-right">
-                                    <p className="text-sm font-bold text-gray-800 dark:text-white leading-none">{user.full_name || "Scholar"}</p>
-                                    <p className="text-[10px] font-medium text-gray-500 uppercase tracking-widest mt-1">{user.institution || "Student"}</p>
-                                </div>
-                                <div className="w-10 h-10 rounded-full glass border border-white/10 overflow-hidden relative group">
-                                    {user.avatar_url ? (
-                                        <img src={user.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary">
-                                            <User size={18} />
-                                        </div>
-                                    )}
-                                </div>
-                                <button onClick={logout} className="p-2 text-gray-500 hover:text-red-400 transition-colors" title="Logout">
-                                    <LogOut size={18} />
-                                </button>
-                            </div>
+                        {hasAccess && (
+                            <button onClick={handleLogout} className="p-2 text-gray-500 hover:text-red-400 transition-colors" title="Logout">
+                                <LogOut size={18} />
+                            </button>
                         )}
                     </div>
                 </header>
@@ -103,27 +81,24 @@ function Layout({ children }) {
 function App() {
     return (
         <Router>
-            <AuthProvider>
-                <Layout>
-                    <Routes>
-                        {/* Public routes */}
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/admin-login" element={<AdminLogin />} />
+            <Layout>
+                <Routes>
+                    {/* Public routes */}
+                    <Route path="/login" element={<Login />} />
 
-                        {/* Protected user routes */}
-                        <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-                        <Route path="/generate" element={<PrivateRoute><GenerateExam /></PrivateRoute>} />
-                        <Route path="/history" element={<PrivateRoute><HistoryPage /></PrivateRoute>} />
-                        <Route path="/adult-games" element={<PrivateRoute><AdultGames /></PrivateRoute>} />
+                    {/* Protected user routes */}
+                    <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+                    <Route path="/generate" element={<PrivateRoute><GenerateExam /></PrivateRoute>} />
+                    <Route path="/history" element={<PrivateRoute><HistoryPage /></PrivateRoute>} />
+                    <Route path="/adult-games" element={<PrivateRoute><AdultGames /></PrivateRoute>} />
 
-                        {/* Admin route — AdminPage has its own session gate */}
-                        <Route path="/admin" element={<AdminPage />} />
+                    {/* Admin route strictly password-protected internally on its component */}
+                    <Route path="/admin" element={<AdminPage />} />
 
-                        {/* Catch-all */}
-                        <Route path="*" element={<Navigate to="/login" replace />} />
-                    </Routes>
-                </Layout>
-            </AuthProvider>
+                    {/* Catch-all */}
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </Layout>
         </Router>
     );
 }

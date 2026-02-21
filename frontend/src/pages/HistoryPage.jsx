@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import { History, FileText, Loader2, BookOpen, AlertCircle, Home, PlusCircle } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 export default function HistoryPage() {
-    const { user } = useAuth();
     const location = useLocation();
     const [exams, setExams] = useState([]);
     const [loading, setLoading] = useState(true);

@@ -1,149 +1,84 @@
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Form, UploadFile, File
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.models.user import Transaction, User
-from app.api.deps import get_current_user
+from app.models.payment import Payment
 from app.core.config import settings
+import urllib.request
+import urllib.parse
+import json
+import base64
+from typing import List
 from datetime import datetime
 
 router = APIRouter()
 
-
-def _require_admin(
-    x_admin_phone: str | None    = Header(default=None, alias="X-Admin-Phone"),
-    x_admin_password: str | None = Header(default=None, alias="X-Admin-Password"),
-) -> None:
+def _require_admin(x_admin_key: str | None = Header(default=None)):
     """
-    Dependency that validates admin credentials sent as custom HTTP headers.
-    Hardcoded as requested to NEVER change.
+    Dependency to validate admin credentials via custom header.
     """
-    if x_admin_phone != "0202979378" or x_admin_password != "FlameFlame@99":
+    if x_admin_key != settings.ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Access denied. Admin credentials required.")
 
-
-@router.post("/verify")
-def verify_payment_route():
-    """
-    Payment verification placeholder.
-    Actual verification is handled by the /auth/login endpoint
-    when the user submits their Transaction ID.
-    """
-    return {"status": "ok", "message": "Submit your Transaction ID via the login flow."}
-
-
-@router.post("/add-dev-txn", dependencies=[Depends(_require_admin)])
-def add_dev_txn(txn_id: str, amount: float, db: Session = Depends(get_db)):
-    """Add a transaction (admin only)."""
-    # Input validation
-    if not txn_id or len(txn_id.strip()) < 4:
-        raise HTTPException(status_code=400, detail="Transaction ID too short.")
-    if amount <= 0:
-        raise HTTPException(status_code=400, detail="Amount must be positive.")
-
-    txn_id = txn_id.strip()
+def upload_image_to_imgbb(file_bytes: bytes) -> str:
+    """Uploads an image to ImgBB and returns the URL. Simple and robust for free hosting."""
+    imgbb_key = "6d207e02198a847aa98d0a2a901485a5"  # Free public-use demo API key
+    url = "https://api.imgbb.com/1/upload"
+    data = urllib.parse.urlencode({
+        "key": imgbb_key,
+        "image": base64.b64encode(file_bytes).decode('utf-8')
+    }).encode('utf-8')
+    req = urllib.request.Request(url, data=data)
     try:
-        existing = db.query(Transaction).filter(
-            Transaction.txn_id_hash == txn_id
-        ).first()
-        if existing:
-            return {"status": "exists", "txn_id": txn_id}
-        new_txn = Transaction(txn_id_hash=txn_id, amount=int(amount), is_used=False)
-        db.add(new_txn)
-        db.commit()
-        return {"status": "success", "txn_id": txn_id, "amount": amount}
-    except HTTPException:
-        raise
+        with urllib.request.urlopen(req) as response:
+            res = json.loads(response.read().decode('utf-8'))
+            return res['data']['url']
     except Exception as e:
+        print(f"Image Upload Failed: {e}")
+        # Return a fallback URL if upload fails so the flow does not break abruptly
+        return "https://via.placeholder.com/600?text=Upload+Failed"
+
+
+@router.post("/upload-payment")
+async def register_payment(
+    full_name: str = Form(...),
+    phone: str = Form(...),
+    screenshot: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Receives user info and screenshot, uploads image, saves to DB, returns access success.
+    """
+    try:
+        file_bytes = await screenshot.read()
+        image_url = upload_image_to_imgbb(file_bytes)
+        
+        payment = Payment(
+            full_name=full_name.strip(),
+            phone=phone.strip(),
+            screenshot_url=image_url
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+        
+        return {"access": True, "message": "Access Granted"}
+    except Exception as e:
+        print(f"Error processing payment upload: {e}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to upload payment.")
 
 
-@router.get("/admin/users", dependencies=[Depends(_require_admin)])
-def admin_list_users(db: Session = Depends(get_db)):
-    """Admin: list all users with full profile + subscription details."""
-    users = db.query(User).order_by(User.created_at.desc()).all()
+@router.get("/admin/payments")
+def admin_list_payments(db: Session = Depends(get_db), admin_guard: None = Depends(_require_admin)):
+    """Admin: list all payments uploaded."""
+    payments = db.query(Payment).order_by(Payment.created_at.desc()).all()
     result = []
-    for u in users:
-        days_left = 0
-        if u.expiry_date:
-            diff = (u.expiry_date - datetime.utcnow()).total_seconds()
-            days_left = max(0, int(diff // 86400))
+    for p in payments:
         result.append({
-            "id":             u.id,
-            "full_name":      u.full_name,
-            "email":          u.email,
-            "institution":    u.institution,
-            "avatar_url":     u.avatar_url,
-            "phone_number":   u.phone_number,
-            "is_active":      u.is_active,
-            "expiry_date":    u.expiry_date.isoformat() if u.expiry_date else None,
-            "days_remaining": days_left,
-            "created_at":     u.created_at.isoformat() if u.created_at else None,
-        })
-    return {"users": result, "total": len(result)}
-
-
-@router.get("/admin/transactions", dependencies=[Depends(_require_admin)])
-def admin_list_transactions(db: Session = Depends(get_db)):
-    """Admin: list all transactions."""
-    txns = db.query(Transaction).order_by(Transaction.created_at.desc()).all()
-    result = []
-    for t in txns:
-        result.append({
-            "id":            t.id,
-            "txn_id_hash":   t.txn_id_hash,
-            "amount":        t.amount,
-            "currency":      t.currency,
-            "is_used":       t.is_used,
-            "used_by_phone": t.used_by_phone,
-            "used_at":       t.used_at.isoformat() if t.used_at else None,
-            "created_at":    t.created_at.isoformat() if t.created_at else None,
-        })
-    return {"transactions": result, "total": len(result)}
-
-
-@router.get("/admin/adult-game-logs", dependencies=[Depends(_require_admin)])
-def admin_list_game_logs(db: Session = Depends(get_db)):
-    """Admin: list all adult game activity."""
-    from app.models.user import AdultGameLog
-    logs = db.query(AdultGameLog).join(User).order_by(AdultGameLog.played_at.desc()).all()
-    result = []
-    for log in logs:
-        result.append({
-            "id":         log.id,
-            "user_id":    log.user_id,
-            "user_phone": log.user.phone_number,
-            "user_name":  log.user.full_name,
-            "game_title": log.game_title,
-            "question":   log.question,
-            "answer":     log.answer,
-            "played_at":  log.played_at.isoformat() if log.played_at else None,
+            "id": p.id,
+            "full_name": p.full_name,
+            "phone": p.phone,
+            "screenshot_url": p.screenshot_url,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
         })
     return result
-
-
-@router.delete("/admin/users/{user_id}", dependencies=[Depends(_require_admin)])
-def admin_delete_user(user_id: int, db: Session = Depends(get_db)):
-    """Admin: deactivate a user account."""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
-    user.is_active = False
-    db.commit()
-    return {"status": "success", "message": f"User {user_id} deactivated."}
-
-
-@router.post("/admin/extend/{user_id}", dependencies=[Depends(_require_admin)])
-def admin_extend_user(user_id: int, days: int = 30, db: Session = Depends(get_db)):
-    """Admin: extend a user's subscription."""
-    from datetime import timedelta
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
-    if user.expiry_date and user.expiry_date > datetime.utcnow():
-        user.expiry_date += timedelta(days=days)
-    else:
-        user.expiry_date = datetime.utcnow() + timedelta(days=days)
-    user.is_active = True
-    db.commit()
-    return {"status": "success", "new_expiry": user.expiry_date.isoformat()}

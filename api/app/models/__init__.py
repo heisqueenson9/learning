@@ -1,2 +1,2 @@
-from .user import User, Transaction
-from .exam import Exam
+from app.models.payment import Payment
+from app.models.exam import Exam
