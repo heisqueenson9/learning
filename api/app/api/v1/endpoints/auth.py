@@ -11,7 +11,10 @@ import os, shutil, uuid, re
 router = APIRouter()
 
 AVATAR_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "static", "avatars")
-os.makedirs(AVATAR_DIR, exist_ok=True)
+try:
+    os.makedirs(AVATAR_DIR, exist_ok=True)
+except OSError:
+    pass
 
 # ── Input sanitization helpers ────────────────────────────────────────────────
 
