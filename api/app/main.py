@@ -56,22 +56,44 @@ except Exception as e:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ── Startup ────────────────────────────────────────────────────────────
+    # print("Creating database tables...")
+    # Base.metadata.create_all(bind=engine)
 
-    # Ensure static dirs exist (may fail gracefully on read-only serverless environments)
+    # ── Auto Schema Update ──────────────────────────────────────────────────
     try:
-        os.makedirs("static/avatars", exist_ok=True)
-        os.makedirs("temp_uploads", exist_ok=True)
-    except OSError:
-        print("Read-only file system detected; skipping directory creation.")
+        from sqlalchemy import inspect, text
+        inspector = inspect(engine)
+        if "users" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("users")]
+            with engine.begin() as conn:
+                for col_name in ["full_name", "email", "institution", "hashed_password", "avatar_url"]:
+                    if col_name not in columns:
+                        try:
+                            # Postgres uses slightly different syntax, but ALTER TABLE ADD COLUMN works
+                            conn.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} VARCHAR"))
+                            print(f"Auto-added missing column: {col_name}")
+                        except Exception as e:
+                            print(f"Could not add {col_name}: {e}")
+    except Exception as e:
+        print(f"Schema generation/update error: {e}")
+
+    # Ensure static dirs exist
+    os.makedirs("static/avatars", exist_ok=True)
+    os.makedirs("temp_uploads", exist_ok=True)
 
     # Pre-warm the AI engine — triggers background model download immediately
-    try:
-        from app.services.ai_engine import ai_engine as _engine  # noqa: F401
-        print("[Startup] AI engine initialised — model loading in background.")
-    except Exception as e:
-        print(f"AI engine init error (serverless environment): {e}")
+    from app.services.ai_engine import ai_engine as _engine  # noqa: F401
+    print("[Startup] AI engine initialised — model loading in background.")
+
+    # Daily subscription-expiry job
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(check_expired_users, "interval", hours=24)
+    scheduler.start()
 
     yield
+
+    # ── Shutdown ───────────────────────────────────────────────────────────
+    scheduler.shutdown()
 
 
 app = FastAPI(

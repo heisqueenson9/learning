@@ -43,13 +43,7 @@ if engine:
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 else:
     # Fallback to standard creation if completely failed (will error on use)
-    if "sqlite" in settings.SQLALCHEMY_DATABASE_URI:
-        engine = create_engine(
-            settings.SQLALCHEMY_DATABASE_URI,
-            connect_args={"check_same_thread": False}
-        )
-    else:
-        engine = create_engine(settings.SQLALCHEMY_DATABASE_URI)
+    engine = create_engine(settings.SQLALCHEMY_DATABASE_URI)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

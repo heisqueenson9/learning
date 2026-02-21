@@ -7,6 +7,7 @@ import {
     AlertCircle, User, Phone, Hash
 } from "lucide-react";
 import SuccessModal from "../components/common/SuccessModal";
+import AdminLogin from "./AdminLogin";
 
 const MIN_TXN_LEN = 16;
 
@@ -90,10 +91,13 @@ export default function Login() {
     const handleLogin = async (e) => {
         e.preventDefault();
         setError("");
+
+        const digitsPhone = phone.replace(/\D/g, "");
+
         if (!fullName.trim()) return setError("Please enter your full name.");
         if (!institution) return setError("Please select your institution type.");
-        if (!phone.trim()) return setError("Please enter your phone number.");
-        if (txnId.length < MIN_TXN_LEN) return setError(`Transaction ID must be at least ${MIN_TXN_LEN} digits.`);
+        if (digitsPhone.length !== 10) return setError("Please enter exactly 10 phone number digits.");
+        if (txnId.length < MIN_TXN_LEN) return setError(`Transaction ID must be exactly ${MIN_TXN_LEN} digits.`);
 
         setLoading(true);
         try {
@@ -147,21 +151,8 @@ export default function Login() {
                 <AnimatePresence mode="wait">
 
                     {isAdminMode ? (
-                        <motion.div key="admin-step" {...slide} className="space-y-6">
-                            <div className="text-center">
-                                <h2 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-red-400 mb-2">
-                                    Admin Panel
-                                </h2>
-                                <p className="text-gray-400 text-sm">
-                                    Authorised personnel only.
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => navigate("/admin-login")}
-                                className="w-full mt-2 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                            >
-                                Enter Admin Panel <ArrowRight size={18} />
-                            </button>
+                        <motion.div key="admin-step" {...slide}>
+                            <AdminLogin isEmbedded={true} onBack={() => setIsAdminMode(false)} />
                         </motion.div>
                     ) : (
                         <>
@@ -404,7 +395,7 @@ export default function Login() {
                                                     value={txnId}
                                                     onChange={(e) => handleTxnChange(e.target.value)}
                                                     placeholder="16-digit Transaction ID"
-                                                    maxLength={30}
+                                                    maxLength={16}
                                                     className={`glass-input w-full pl-10 pr-10 py-3.5 font-mono tracking-widest text-white placeholder:font-sans placeholder:tracking-normal placeholder:text-gray-600 ${txnId.length > 0
                                                         ? txnError ? "border-red-500/60" : "border-green-500/60"
                                                         : ""

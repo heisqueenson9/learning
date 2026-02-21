@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
     # Base.metadata.create_all(bind=engine)
 
     # ── Auto Schema Update ──────────────────────────────────────────────────
-    if "sqlite" in str(engine.url):
+    try:
         from sqlalchemy import inspect, text
         inspector = inspect(engine)
         if "users" in inspector.get_table_names():
@@ -69,10 +69,13 @@ async def lifespan(app: FastAPI):
                 for col_name in ["full_name", "email", "institution", "hashed_password", "avatar_url"]:
                     if col_name not in columns:
                         try:
+                            # Postgres uses slightly different syntax, but ALTER TABLE ADD COLUMN works
                             conn.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} VARCHAR"))
                             print(f"Auto-added missing column: {col_name}")
                         except Exception as e:
                             print(f"Could not add {col_name}: {e}")
+    except Exception as e:
+        print(f"Schema generation/update error: {e}")
 
     # Ensure static dirs exist
     os.makedirs("static/avatars", exist_ok=True)

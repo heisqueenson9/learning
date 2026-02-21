@@ -41,15 +41,9 @@ class AIEngine:
         self._loading = False
         self._load_failed = False
 
-        if os.environ.get("VERCEL"):
-            # Vercel serverless has a 250MB lambda limit and 10s timeout.
-            # We cannot download/load a 2GB model here. Safely skip to mock generator.
-            self._load_failed = True
-            print("[AIEngine] Running in Vercel Serverless environment — using fallback mock engine.")
-        else:
-            # Kick off background download/load immediately so it's ready sooner.
-            threading.Thread(target=self._load_model, daemon=True).start()
-            print(f"[AIEngine] Initialised — loading {MODEL_NAME} in background…")
+        # Kick off background download/load immediately so it's ready sooner.
+        threading.Thread(target=self._load_model, daemon=True).start()
+        print(f"[AIEngine] Initialised — loading {MODEL_NAME} in background…")
 
     # ──────────────────────────────────────────────────────────────────────────
     # Model loading

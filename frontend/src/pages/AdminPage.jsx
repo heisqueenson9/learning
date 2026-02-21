@@ -133,7 +133,7 @@ export default function AdminPage() {
                     <p className="text-gray-400 mt-2">Please authenticate to access the command center.</p>
                 </div>
                 <button
-                    onClick={() => window.location.href = "/admin-login"}
+                    onClick={() => window.location.href = "/login?role=admin"}
                     className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold rounded-xl shadow-lg transition-transform hover:scale-105"
                 >
                     Go to Admin Login

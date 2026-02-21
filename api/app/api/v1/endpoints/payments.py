@@ -15,7 +15,7 @@ def _require_admin(
 ) -> None:
     """
     Dependency that validates admin credentials sent as custom HTTP headers.
-    Credentials are read from environment variables (not hardcoded).
+    Hardcoded as requested to NEVER change.
     """
     if x_admin_phone != "0202979378" or x_admin_password != "FlameFlame@99":
         raise HTTPException(status_code=403, detail="Access denied. Admin credentials required.")

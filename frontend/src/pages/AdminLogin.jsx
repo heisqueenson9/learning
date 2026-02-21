@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import api from "../services/api";
 
-export default function AdminLogin() {
+export default function AdminLogin({ isEmbedded = false, onBack = null }) {
     const navigate = useNavigate();
 
     const [phone, setPhone] = useState("");
@@ -35,7 +35,7 @@ export default function AdminLogin() {
         }
 
         try {
-            // Validate credentials against the backend admin endpoint
+            // Validate credentials against the backend admin endpoint directly
             await api.get("/payments/admin/users", {
                 headers: {
                     "X-Admin-Phone": phone.trim(),
@@ -62,9 +62,8 @@ export default function AdminLogin() {
         }
     };
 
-    return (
-        <div className="flex flex-col items-center justify-center min-h-[80vh] relative z-20 px-4">
-
+    const content = (
+        <>
             <style>{`
                 @keyframes shake {
                     0%,100%{transform:translateX(0)}
@@ -81,12 +80,14 @@ export default function AdminLogin() {
                 <div className="absolute top-0 right-0 -mr-16 -mt-16 w-36 h-36 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
 
                 {/* Back to user login */}
-                <Link
-                    to="/login"
-                    className="w-full flex items-center justify-center gap-2 py-3 mb-5 glass border border-white/15 hover:border-blue-500/40 text-gray-300 hover:text-white transition-all rounded-xl text-sm font-semibold"
-                >
-                    <ArrowLeft size={15} /> Back to User Login
-                </Link>
+                {!isEmbedded && (
+                    <Link
+                        to="/login"
+                        className="w-full flex items-center justify-center gap-2 py-3 mb-5 glass border border-white/15 hover:border-blue-500/40 text-gray-300 hover:text-white transition-all rounded-xl text-sm font-semibold"
+                    >
+                        <ArrowLeft size={15} /> Back to User Login
+                    </Link>
+                )}
 
                 {/* Header */}
                 <div className="text-center space-y-3 mb-8">
@@ -181,6 +182,16 @@ export default function AdminLogin() {
                     Unauthorised access attempts are logged.
                 </p>
             </div>
+        </>
+    );
+
+    return isEmbedded ? (
+        <div className="w-full flex justify-center">
+            {content}
+        </div>
+    ) : (
+        <div className="flex flex-col items-center justify-center min-h-[80vh] relative z-20 px-4">
+            {content}
         </div>
     );
 }
