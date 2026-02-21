@@ -33,7 +33,7 @@ class AIEngine:
         """
         topic      = logic.get("topic", "General Knowledge")
         difficulty = logic.get("difficulty", "Moderate")
-        num_q      = int(logic.get("num_questions", 50))
+        num_q      = int(logic.get("num_questions", 100))
 
         difficulty_hint = {
             "Easy": "straightforward recall questions",

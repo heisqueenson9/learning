@@ -160,27 +160,35 @@ export default function GenerateExam() {
         try {
             const data = await generateWithRetry(formData);
 
-            // Parse JSON Content
+            // Parse quiz content — backend now returns questions as an object directly
             let parsedQuestions;
             try {
-                // The backend returns { ... questions: "JSON_STRING" }
-                // OR checking if it returns raw text if AI failed to JSONify
                 const content = data.questions;
-                if (typeof content === 'object') {
+                if (!content) {
+                    throw new Error("No questions data returned from server.");
+                }
+                if (typeof content === 'object' && !Array.isArray(content)) {
+                    // Already a parsed object — ideal case from the new backend
                     parsedQuestions = content;
-                } else {
-                    // Try to clean markdown code blocks if present // ```json ... ```
-                    const cleanedContent = content.replace(/```json/g, "").replace(/```/g, "").trim();
+                } else if (typeof content === 'string') {
+                    // Legacy: backend returned questions as a JSON string
+                    const cleanedContent = content
+                        .replace(/```json/g, "")
+                        .replace(/```/g, "")
+                        .trim();
                     parsedQuestions = JSON.parse(cleanedContent);
+                } else {
+                    throw new Error("Unexpected format from server.");
                 }
             } catch (jsonErr) {
-                setError("Received invalid quiz format. Please try again or use a simpler topic.");
+                setError("Received an invalid quiz format from the server. Please try a different topic or try again.");
                 setLoading(false);
                 return;
             }
 
-            if (!parsedQuestions.questions || !Array.isArray(parsedQuestions.questions)) {
-                setError("Invalid question format received.");
+            // Validate the questions array exists
+            if (!parsedQuestions?.questions || !Array.isArray(parsedQuestions.questions) || parsedQuestions.questions.length === 0) {
+                setError("The server returned an empty quiz. Please try again with a different topic.");
                 setLoading(false);
                 return;
             }
@@ -192,14 +200,12 @@ export default function GenerateExam() {
         } catch (err) {
             let message = "Generation failed. Please try again.";
 
-            if (err.code === "ECONNABORTED" || err.message.includes("timeout")) {
-                message = "The request timed out. The server is taking longer than expected. Please try uploading a smaller file or try again.";
+            if (err.code === "ECONNABORTED" || err.message?.includes("timeout")) {
+                message = "Request timed out. The server may still be processing — check History in a few minutes.";
             } else if (err.response) {
-                // If backend sent a comprehensive error
                 message = err.response.data?.detail || `Server Error (${err.response.status}): ${err.response.statusText}`;
             } else if (err.request) {
-                // Request made but no response received
-                message = "Network Error: No response from server. Please check your connection.";
+                message = "Network error — no response from server. Please check your internet connection.";
             } else {
                 message = err.message || "An unexpected error occurred.";
             }
