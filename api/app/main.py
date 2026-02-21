@@ -44,19 +44,18 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+# ── Database Initialization (Serverless Safe) ──────────────────────────────────
+try:
+    print("Creating database tables...")
+    Base.metadata.create_all(bind=engine)
+    print("Database tables created or verified.")
+except Exception as e:
+    print(f"Error during db setup: {e}")
+
 # ── Lifespan ─────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ── Startup ────────────────────────────────────────────────────────────
-    print("Creating database tables...")
-    try:
-        if not str(engine.url).startswith("sqlite"):
-            Base.metadata.create_all(bind=engine)
-            print("PostgreSQL tables created or verified.")
-        else:
-            Base.metadata.create_all(bind=engine)
-    except Exception as e:
-        print(f"Error during db setup: {e}")
 
     # Ensure static dirs exist (may fail gracefully on read-only serverless environments)
     try:

@@ -39,6 +39,9 @@ class Settings(BaseSettings):
                 "SQLALCHEMY_DATABASE_URI",
                 self.SQLALCHEMY_DATABASE_URI.replace("postgres://", "postgresql://", 1),
             )
+        # Fix for Vercel Serverless environment where ./ is read-only
+        if os.getenv("VERCEL") == "1" and self.SQLALCHEMY_DATABASE_URI.startswith("sqlite"):
+            object.__setattr__(self, "SQLALCHEMY_DATABASE_URI", "sqlite:////tmp/apex.db")
 
     def get_allowed_origins(self) -> list:
         """Parse ALLOWED_ORIGINS env var into a list."""
