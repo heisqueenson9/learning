@@ -6,13 +6,5 @@ python-dotenv
 passlib[bcrypt]
 python-jose[cryptography]
 pydantic
-pydantic-settings
-alembic
-apscheduler
-PyPDF2
-pdfplumber
-python-docx
-python-pptx
-slowapi
-pytest
+python-multipart
 httpx

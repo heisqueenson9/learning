@@ -6,31 +6,11 @@ from app.core.config import settings
 from app.api.v1.endpoints import auth, exams, users, payments
 from contextlib import asynccontextmanager
 from app.db.session import engine, Base, SessionLocal
-from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 from app.models.user import User
 from fastapi.staticfiles import StaticFiles
 import os
 import time
-
-
-# ── Expiry job ────────────────────────────────────────────────────────────────
-def check_expired_users():
-    db = SessionLocal()
-    try:
-        expired_users = db.query(User).filter(
-            User.expiry_date < datetime.utcnow(),
-            User.is_active == True
-        ).all()
-        for user in expired_users:
-            user.is_active = False
-            print(f"Deactivated user {user.phone_number} due to expiry.")
-        db.commit()
-    except Exception as e:
-        print(f"Error in expiry job: {e}")
-    finally:
-        db.close()
-
 
 # ── Security headers middleware ───────────────────────────────────────────────
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -81,19 +61,12 @@ async def lifespan(app: FastAPI):
     os.makedirs("static/avatars", exist_ok=True)
     os.makedirs("temp_uploads", exist_ok=True)
 
-    # Pre-warm the AI engine — triggers background model download immediately
+    # Pre-warm the AI engine 
     from app.services.ai_engine import ai_engine as _engine  # noqa: F401
-    print("[Startup] AI engine initialised — model loading in background.")
-
-    # Daily subscription-expiry job
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(check_expired_users, "interval", hours=24)
-    scheduler.start()
+    print("[Startup] AI engine initialised.")
 
     yield
 
-    # ── Shutdown ───────────────────────────────────────────────────────────
-    scheduler.shutdown()
 
 
 app = FastAPI(

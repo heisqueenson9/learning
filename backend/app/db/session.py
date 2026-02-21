@@ -10,15 +10,15 @@ def create_db_engine():
     retry_delay = 2
     for attempt in range(max_retries):
         try:
-            if "sqlite" in settings.SQLALCHEMY_DATABASE_URI:
+            if settings.DATABASE_URL and "sqlite" in settings.DATABASE_URL:
                 engine = create_engine(
-                    settings.SQLALCHEMY_DATABASE_URI,
+                    settings.DATABASE_URL,
                     connect_args={"check_same_thread": False},
                     pool_pre_ping=True
                 )
             else:
                 engine = create_engine(
-                    settings.SQLALCHEMY_DATABASE_URI,
+                    settings.DATABASE_URL or "sqlite:///./apex.db",
                     pool_pre_ping=True
                 )
             # Test connection
@@ -43,7 +43,7 @@ if engine:
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 else:
     # Fallback to standard creation if completely failed (will error on use)
-    engine = create_engine(settings.SQLALCHEMY_DATABASE_URI)
+    engine = create_engine(settings.DATABASE_URL or "sqlite:///./apex.db")
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
